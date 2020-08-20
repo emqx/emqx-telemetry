@@ -137,7 +137,12 @@ init([Opts]) ->
                    report_interval = timer:seconds(get_value(report_interval, Opts))},
     NState = case mnesia:dirty_read(?TELEMETRY, ?UNIQUE_ID) of
                  [] ->
-                     Enabled = get_value(enabled, Opts),
+                     Enabled = case search_telemetry_enabled() of
+                                   {error, not_found} ->
+                                       get_value(enabled, Opts);
+                                   {M, F} ->
+                                       erlang:apply(M, F, [])
+                               end,
                      UUID = generate_uuid(),
                      mnesia:dirty_write(?TELEMETRY, #telemetry{id = ?UNIQUE_ID,
                                                                uuid = UUID,
@@ -214,16 +219,11 @@ emqx_version() ->
     Version.
 
 license() ->
-    case search_license_callback() of
+    case search_telemetry_license() of
         {error, not_found} ->
             [{edition, <<"community">>}];
         {M, F} ->
-            case erlang:function_exported(M, F, 0) of
-                true ->
-                    erlang:apply(M, F, []);
-                false ->
-                    [{edition, <<"enterprise">>}] 
-            end
+            erlang:apply(M, F, [])
     end.
 
 os_info() ->
@@ -372,22 +372,40 @@ ignore_lib_apps(Apps) ->
                wx],
     [AppName || {AppName, _, _} <- Apps, not lists:member(AppName, LibApps)].
 
-search_license_callback() ->
-    search_license_callback(ignore_lib_apps(application:loaded_applications()), []).
+search_telemetry_license() ->
+    search_function(telemetry_license).
 
-search_license_callback([], []) ->
-    {error, not_found};
-search_license_callback([], [Callback | _]) ->
-    Callback;
-search_license_callback([App | More], Acc) ->
-    {ok, Modules} = application:get_key(App, modules),
-    Callbacks = lists:foldl(fun(Module, AccIn) ->
-                                case proplists:get_value(license_callback, module_attributes(Module), undefined) of
-                                    undefined -> AccIn;
-                                    [Callback | _] -> [{Module, Callback} | AccIn]
-                                end
-                            end, [], Modules),
-    search_license_callback(More, Acc ++ Callbacks).
+search_telemetry_enabled() ->
+    search_function(telemetry_enabled).
+
+search_function(Name) ->
+    case search_attrs(Name) of
+        [] ->
+            {error, not_found};
+        Callbacks ->
+            case lists:filter(fun({M, F}) ->
+                                  erlang:function_exported(M, F, 0)
+                              end, Callbacks) of
+                [] -> {error, not_found};
+                [{M, F} | _] -> {M, F}
+            end
+    end.
+
+search_attrs(Name) ->
+    Apps = ignore_lib_apps(application:loaded_applications()),
+    search_attrs(Name, Apps).
+
+search_attrs(Name, Apps) ->
+    lists:foldl(fun(App, Acc) ->
+                    {ok, Modules} = application:get_key(App, modules),
+                    Attrs = lists:foldl(fun(Module, Acc0) ->
+                                                case proplists:get_value(Name, module_attributes(Module), undefined) of
+                                                    undefined -> Acc0;
+                                                    Attrs0 -> Acc0 ++ Attrs0
+                                                end
+                                            end, [], Modules),
+                    Acc ++ Attrs
+                end, [], Apps).
 
 module_attributes(Module) ->
     try Module:module_info(attributes)
