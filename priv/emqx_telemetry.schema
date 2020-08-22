@@ -2,12 +2,12 @@
 %% Retainer config mapping
 
 {mapping, "telemetry.enabled", "emqx_telemetry.enabled", [
-  {default, false},
+  {default, true},
   {datatype, {enum, [true, false]}}
 ]}.
 
 {mapping, "telemetry.url", "emqx_telemetry.url", [
-  {default, "https://telemetry-emqx-io.bigpar.vercel.app/api/telemetry"},
+  {default, "https://telemetry.emqx.io/api/telemetry"},
   {datatype, string}
 ]}.
 
