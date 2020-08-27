@@ -285,7 +285,7 @@ nodes_uuid() ->
                     case rpc:call(Node, ?MODULE, get_uuid, []) of
                         {badrpc, _Reason} ->
                             Acc;
-                        UUID ->
+                        {ok, UUID} ->
                             [UUID | Acc]
                     end
                 end, [], Nodes).
