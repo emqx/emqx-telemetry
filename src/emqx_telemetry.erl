@@ -307,7 +307,7 @@ active_modules() ->
                 end, [], emqx_modules:list()).
 
 num_clients() ->
-    emqx_stats:getstat('connections.count').
+    emqx_stats:getstat('connections.max').
 
 messages_sent() ->
     emqx_metrics:val('messages.sent').
