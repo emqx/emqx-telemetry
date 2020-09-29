@@ -346,17 +346,9 @@ report_telemetry(State = #state{url = URL}) ->
     Data = get_telemetry(State),
     case emqx_json:safe_encode(Data) of
         {ok, Bin} ->
-            case httpc_request(post, URL, [], Bin) of
-                {ok, {{_, StatusCode, _}, _, _}}
-                  when StatusCode =:= 200 orelse StatusCode =:= 204 ->
-                    ?LOG(debug, "Report ~p successfully", [Bin]);
-                {ok, {{_, StatusCode, ReasonPhrase}, _, Body}} ->
-                    ?LOG(error, "Report ~p failed due to ~p ~s(~s)", [Bin, StatusCode, ReasonPhrase, Body]);
-                {error, Reason} ->
-                    ?LOG(error, "Report ~p failed due to ~p", [Bin, Reason])
-            end;
+            httpc_request(post, URL, [], Bin);
         {error, Reason} ->
-            ?LOG(error, "Encode ~p failed due to ~p", [Data, Reason])
+            ?LOG(debug, "Encode ~p failed due to ~p", [Data, Reason])
     end.
 
 httpc_request(Method, URL, Headers, Body) ->
